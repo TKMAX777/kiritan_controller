@@ -2,6 +2,7 @@ package kiritan_handler
 
 import (
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -26,16 +27,16 @@ type Handler struct {
 }
 
 func New() (*Handler, error) {
-	var err error
 	var handler = Handler{}
-	handler.hwnd, err = handler.getHandler(windowName)
-	if err != nil {
-		handler.hwnd, err = handler.getHandler(windowName + "*")
-		if err != nil {
-			return nil, errors.Wrap(err, "GetHandler")
+	handler.hwnd = winapi.FindWindow(nil, winapi.MustUTF16PtrFromString(windowName))
+	if handler.hwnd == win.HWND(winapi.NULL) {
+		handler.hwnd = winapi.FindWindow(nil, winapi.MustUTF16PtrFromString(windowName+"*"))
+		if handler.hwnd == win.HWND(winapi.NULL) {
+			return nil, errors.New("GetHandler")
 		}
 	}
 
+	var err error
 	func() {
 		defer func() {
 			var derr = recover()
@@ -60,38 +61,6 @@ func New() (*Handler, error) {
 	}()
 
 	return &handler, err
-}
-
-func (h Handler) getHandler(windowName string) (win.HWND, error) {
-	var getHWND win.HWND
-	var found bool
-
-	var enumWndProc = func(hwnd win.HWND, lParam *uintptr) uintptr {
-		var name = make([]uint16, 1000)
-		ok := winapi.GetWindowText(hwnd, uintptr(unsafe.Pointer(&name[0])), 1000)
-		if ok == 0 {
-			return uintptr(1)
-		}
-
-		if syscall.UTF16ToString(name) == windowName {
-			getHWND = hwnd
-			found = true
-			return uintptr(0)
-		}
-
-		return uintptr(1)
-	}
-
-	winapi.EnumDesktopWindows(win.HANDLE(winapi.NULL), syscall.NewCallback(enumWndProc), winapi.NULL)
-	if !found {
-		return win.HWND(winapi.NULL), errors.New("NotFound")
-	}
-
-	if getHWND == win.HWND(winapi.NULL) {
-		return win.HWND(winapi.NULL), errors.New("GetWindows")
-	}
-
-	return getHWND, nil
 }
 
 func (h Handler) SetText(text string) error {
@@ -135,13 +104,101 @@ func (h Handler) Stop() {
 	)
 }
 
-func (h Handler) Save() {
-	winapi.SendMessage(
+func (h Handler) Save(filepath string) error {
+	// press button: "音声保存"
+	// this function blocks until the saving dialog destroyed
+	go winapi.SendMessage(
 		h.controls.save,
 		win.BM_CLICK,
 		winapi.NULL,
 		winapi.NULL,
 	)
+
+	var mainHwnd, editHWND, saveHWND win.HWND
+	var err error
+	var ferr = func() error {
+		defer func() {
+			var derr = recover()
+			if derr != nil {
+				err = errors.Errorf("GetPtr: %v", derr)
+			}
+		}()
+
+		for {
+			mainHwnd = winapi.FindWindow(winapi.MustUTF16PtrFromString("#32770"), winapi.MustUTF16PtrFromString("音声ファイルの保存"))
+			if mainHwnd == win.HWND(winapi.NULL) {
+				time.Sleep(time.Millisecond * 500)
+				continue
+			}
+			break
+		}
+
+		time.Sleep(time.Second)
+
+		editHWND = winapi.FindWindowEx(mainHwnd, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("DUIViewWndClassName"), nil)
+		if editHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundDUIViewWndClassName")
+		}
+
+		editHWND = winapi.FindWindowEx(editHWND, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("DirectUIHWND"), nil)
+		if editHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundDirectUIHWND")
+		}
+
+		editHWND = winapi.FindWindowEx(editHWND, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("FloatNotifySink"), nil)
+		if editHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundFloatNotifySink")
+		}
+
+		editHWND = winapi.FindWindowEx(editHWND, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("ComboBox"), nil)
+		if editHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundComboBox")
+		}
+
+		editHWND = winapi.FindWindowEx(editHWND, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("Edit"), nil)
+		if editHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundEdit")
+		}
+
+		saveHWND = winapi.FindWindowEx(mainHwnd, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("Button"), nil)
+		if saveHWND == win.HWND(winapi.NULL) {
+			return errors.New("NotFoundSaveButton")
+		}
+
+		winapi.SendMessage(editHWND, win.WM_SETTEXT, winapi.NULL, uintptr(unsafe.Pointer(winapi.MustUTF16PtrFromString(filepath))))
+		go winapi.SendMessage(saveHWND, win.BM_CLICK, winapi.NULL, winapi.NULL)
+
+		time.Sleep(time.Second)
+
+		var dialog win.HWND
+		for {
+			// search overwrite dialogs
+			dialog = winapi.FindWindowEx(win.HWND(winapi.NULL), dialog, winapi.MustUTF16PtrFromString("#32770"), winapi.MustUTF16PtrFromString("音声ファイルの保存"))
+			if dialog == win.HWND(winapi.NULL) {
+				return nil
+			}
+
+			// button: "はい"
+			var button = winapi.FindWindowEx(dialog, win.HWND(winapi.NULL), winapi.MustUTF16PtrFromString("Button"), nil)
+			if button == win.HWND(winapi.NULL) {
+				continue
+			}
+
+			go winapi.SendMessage(button, win.BM_CLICK, winapi.NULL, winapi.NULL)
+			return nil
+		}
+	}()
+
+	winapi.SendMessage(mainHwnd, win.WM_CLOSE, winapi.NULL, winapi.NULL)
+
+	switch {
+	case err != nil:
+		return errors.Wrap(err, "ControlConsoleWindow")
+	case ferr != nil:
+		return errors.Wrap(ferr, "ControlConsoleWindow")
+	}
+
+	return nil
 }
 
 func (h Handler) TimeMessage() {
