@@ -1,4 +1,4 @@
-# KIRITAN Controller
+# KIRITAN Handler
 ## 概要
 東北きりたんのGUIの一部をGoから制御するライブラリ。
 
