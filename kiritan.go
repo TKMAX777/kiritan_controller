@@ -13,7 +13,6 @@ import (
 const windowName = "VOICEROID＋ 東北きりたん EX"
 
 type Handler struct {
-	NULL uintptr
 	hwnd win.HWND
 
 	controls struct {
@@ -83,13 +82,13 @@ func (h Handler) getHandler(windowName string) (win.HWND, error) {
 		return uintptr(1)
 	}
 
-	winapi.EnumDesktopWindows(win.HANDLE(h.NULL), syscall.NewCallback(enumWndProc), h.NULL)
+	winapi.EnumDesktopWindows(win.HANDLE(winapi.NULL), syscall.NewCallback(enumWndProc), winapi.NULL)
 	if !found {
-		return win.HWND(h.NULL), errors.New("NotFound")
+		return win.HWND(winapi.NULL), errors.New("NotFound")
 	}
 
-	if getHWND == win.HWND(h.NULL) {
-		return win.HWND(h.NULL), errors.New("GetWindows")
+	if getHWND == win.HWND(winapi.NULL) {
+		return win.HWND(winapi.NULL), errors.New("GetWindows")
 	}
 
 	return getHWND, nil
@@ -104,7 +103,7 @@ func (h Handler) SetText(text string) error {
 	var resRow = winapi.SendMessage(
 		h.controls.text,
 		win.WM_SETTEXT,
-		h.NULL,
+		winapi.NULL,
 		uintptr(unsafe.Pointer(&value[0])),
 	)
 
@@ -122,8 +121,8 @@ func (h Handler) Play() {
 	winapi.SendMessage(
 		h.controls.play,
 		win.BM_CLICK,
-		h.NULL,
-		h.NULL,
+		winapi.NULL,
+		winapi.NULL,
 	)
 }
 
@@ -131,8 +130,8 @@ func (h Handler) Stop() {
 	winapi.SendMessage(
 		h.controls.stop,
 		win.BM_CLICK,
-		h.NULL,
-		h.NULL,
+		winapi.NULL,
+		winapi.NULL,
 	)
 }
 
@@ -140,8 +139,8 @@ func (h Handler) Save() {
 	winapi.SendMessage(
 		h.controls.save,
 		win.BM_CLICK,
-		h.NULL,
-		h.NULL,
+		winapi.NULL,
+		winapi.NULL,
 	)
 }
 
@@ -149,7 +148,7 @@ func (h Handler) TimeMessage() {
 	winapi.SendMessage(
 		h.controls.time,
 		win.BM_CLICK,
-		h.NULL,
-		h.NULL,
+		winapi.NULL,
+		winapi.NULL,
 	)
 }
