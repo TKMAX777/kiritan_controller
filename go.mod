@@ -1,4 +1,4 @@
-module github.com/TKMAX777/kiritan_controller
+module github.com/TKMAX777/kiritan_handler
 
 go 1.17
 
