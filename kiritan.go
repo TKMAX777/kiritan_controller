@@ -1,6 +1,7 @@
 package kiritan_handler
 
 import (
+	"os"
 	"syscall"
 	"time"
 	"unsafe"
@@ -114,8 +115,15 @@ func (h Handler) Save(filepath string) error {
 		winapi.NULL,
 	)
 
-	var mainHwnd, editHWND, saveHWND win.HWND
 	var err error
+
+	// if file already exists, remove it beforehand
+	_, err = os.Stat(filepath)
+	if err == nil {
+		os.Remove(filepath)
+	}
+
+	var mainHwnd, editHWND, saveHWND win.HWND
 	var ferr = func() error {
 		defer func() {
 			var derr = recover()
