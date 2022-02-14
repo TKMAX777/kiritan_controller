@@ -2,6 +2,8 @@ package kiritan_handler
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -105,7 +107,9 @@ func (h Handler) Stop() {
 	)
 }
 
-func (h Handler) Save(filepath string) error {
+// Save saves the audio and text file to the specified location
+//  This method will overwrite files if they already exist.
+func (h Handler) Save(FilePath string) error {
 	// press button: "音声保存"
 	// this function blocks until the saving dialog destroyed
 	go winapi.SendMessage(
@@ -117,10 +121,16 @@ func (h Handler) Save(filepath string) error {
 
 	var err error
 
-	// if file already exists, remove it beforehand
-	_, err = os.Stat(filepath)
+	// if the file already exists, remove it beforehand
+	_, err = os.Stat(FilePath)
 	if err == nil {
-		os.Remove(filepath)
+		os.Remove(FilePath)
+	}
+
+	var textFilePath = strings.TrimSuffix(FilePath, filepath.Ext(FilePath)) + ".txt"
+	_, err = os.Stat(textFilePath)
+	if err == nil {
+		os.Remove(textFilePath)
 	}
 
 	var mainHwnd, editHWND, saveHWND win.HWND
@@ -173,7 +183,7 @@ func (h Handler) Save(filepath string) error {
 			return errors.New("NotFoundSaveButton")
 		}
 
-		winapi.SendMessage(editHWND, win.WM_SETTEXT, winapi.NULL, uintptr(unsafe.Pointer(winapi.MustUTF16PtrFromString(filepath))))
+		winapi.SendMessage(editHWND, win.WM_SETTEXT, winapi.NULL, uintptr(unsafe.Pointer(winapi.MustUTF16PtrFromString(FilePath))))
 		go winapi.SendMessage(saveHWND, win.BM_CLICK, winapi.NULL, winapi.NULL)
 
 		time.Sleep(time.Second)
