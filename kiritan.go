@@ -89,13 +89,40 @@ func (h Handler) SetText(text string) error {
 	}
 }
 
-func (h Handler) Play() {
+func (h Handler) Play() error {
+	var name = make([]uint16, 1000)
+	winapi.GetWindowText(h.controls.play, uintptr(unsafe.Pointer(&name[0])), 1000)
+
+	var windowText = syscall.UTF16ToString(name)
+	if windowText != "再生" && windowText != "再開" {
+		return errors.New("Kiritan is busy")
+	}
+
 	winapi.SendMessage(
 		h.controls.play,
 		win.BM_CLICK,
 		winapi.NULL,
 		winapi.NULL,
 	)
+
+	return nil
+}
+
+func (h Handler) Pause() error {
+	var name = make([]uint16, 1000)
+	winapi.GetWindowText(h.controls.play, uintptr(unsafe.Pointer(&name[0])), 1000)
+	if syscall.UTF16ToString(name) != "一時停止" {
+		return errors.New("Kiritan is not playing")
+	}
+
+	winapi.SendMessage(
+		h.controls.play,
+		win.BM_CLICK,
+		winapi.NULL,
+		winapi.NULL,
+	)
+
+	return nil
 }
 
 func (h Handler) Stop() {
