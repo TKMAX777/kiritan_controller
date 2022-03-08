@@ -5,7 +5,7 @@
 ## 仕組み
 Win32APIで適当にGUIを操作しているだけ。
 
-## Useage
+## Usage
 
 ```go
 import "github.com/TKMAX777/kiritan_handler"
